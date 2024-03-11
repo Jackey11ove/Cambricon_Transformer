@@ -66,6 +66,9 @@ typedef enum {
     RELU,
     LRN,
     UNPOOL,
+    SOFTMAX,
+    SELF_ATTENTION,
+    MULTIHEAD_ATTENTION,
     EMPTY,
     BLANK
 } LAYER_TYPE;
@@ -93,6 +96,10 @@ struct layer {
     int maxpool_depth;
     int out_channels;
     int peephole;
+
+    int lut;  // 0 means using taylor for nolinear operator, 1 means using lut
+    int d_model;  // dimension of vectors in Q K V
+    int N_head;  //param for multihead_attention
 
     struct layer *input_layer;
     struct layer *self_layer;

@@ -26,9 +26,9 @@ char *option_find_str(list *l, char *key, char *def);
 char *option_find_str_quiet(list *l, char *key, char *def);
 // 链表中寻找对应key的val值，找到了就将其转换为整型返回，未找到就返回def值
 int option_find_int(list *l, char *key, int def);
-// 作用同上，但不在输出流上显示未找到情况下的日志
+// 链表中寻找对应key的val值，找到了就将其转换为整型返回，未找到就返回def值，但不在输出流上显示未找到情况下的日志
 int option_find_int_quiet(list *l, char *key, int def);
-// 作用同上
+// 链表中寻找对应key的val值，找到了就将其转换为float返回，未找到就返回def值
 float option_find_float(list *l, char *key, float def);
 float option_find_float_quiet(list *l, char *key, float def);
 // 在list l中寻找unused的节点，打印相关键值对

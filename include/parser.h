@@ -8,6 +8,7 @@
 extern "C" {
 #endif
 
+// parameters related, maybe need to add something new for the new operator
 typedef struct size_params{
     int batch;
     int inputs;
@@ -32,6 +33,9 @@ layer parse_relu(list *options, size_params params);
 layer parse_lrn(list *options, size_params params);
 layer parse_deconv(list *options, size_params params);
 layer parse_unpool(list *options, size_params params);
+layer parse_softmax(list *options, size_params params);
+layer parse_self_attention(list *options, size_params params);
+layer parse_multihead_attention(list *options, size_params params);
 
 network parse_network_cfg(char *filename);
 void parse_hardware_cfg(char *filename, asic *hardware);

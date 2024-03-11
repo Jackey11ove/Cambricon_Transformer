@@ -37,6 +37,9 @@ LAYER_TYPE string_to_layer_type(char * type) {
     if (strcmp(type, "[relu]")==0)               return RELU;
     if (strcmp(type, "[deconvolutional]")==0)    return DECONV;
     if (strcmp(type, "[unpool]") == 0)           return UNPOOL;
+    if (strcmp(type, "[softmax]")==0 )           return SOFTMAX;
+    if (strcmp(type, "[self_attention]")==0 )    return SELF_ATTENTION;
+    if (strcmp(type, "[multihead_attention]")==0 ) return MULTIHEAD_ATTENTION;
     if (strcmp(type, "[empty]") == 0)            return EMPTY;
     return BLANK;
 }
@@ -81,7 +84,7 @@ layer parse_convolutional(list *options, size_params params) {
   if(share_index >= 0) share_layer = &params.net.layers[share_index];
   else if(share_index != -1000000000) share_layer = &params.net.layers[params.index + share_index];
 
-
+  l.type = CONVOLUTIONAL;
   l.h = params.h;
   l.w = params.w;
   l.c = params.c;
@@ -458,6 +461,52 @@ layer parse_unpool(list *options, size_params params) {
 }
 
 
+//@softmax
+layer parse_softmax(list *options, size_params params){
+  layer l;
+
+  l.type = SOFTMAX;
+  l.h = params.h;
+  l.w = params.w;
+  l.lut = option_find_int(options, "lut", 0);
+
+  return l;
+}
+
+//@self_attention
+layer parse_self_attention(list *options, size_params params){
+  layer l;
+
+  l.type = SELF_ATTENTION;
+  l.h = params.h;
+  l.w = params.w;
+  l.lut = option_find_int(options, "lut", 0);
+  l.d_model = option_find_int(options, "d_model", 1);
+
+  l.out_h = params.h;
+  l.out_w = l.d_model;
+
+  return l;
+}
+
+//@multihead_attention
+layer parse_multihead_attention(list *options, size_params params){
+  layer l;
+
+  l.type = MULTIHEAD_ATTENTION;
+  l.h = params.h;
+  l.w = params.w;
+  l.lut = option_find_int(options, "lut", 0);
+  l.d_model = option_find_int(options, "d_model", 1);
+  l.N_head = option_find_int(options, "N_head", 8);
+
+  l.out_h = params.h;
+  l.out_w = params.w;
+
+  return l;
+}
+
+
 
 //=============================================================
 void parse_net_options(list *options, network *net) {
@@ -473,6 +522,7 @@ network parse_network_cfg(char *filename) {
   list *sections = read_cfg(filename);
   node *n = sections->front;
   if(!n) error("Config file has no sections");
+  // network包含了网络的参数，以及net中各个层的参数，net->n表示该网络有多少层
   network net = make_network(sections->size - 1);
   size_params params;
 
@@ -524,7 +574,14 @@ network parse_network_cfg(char *filename) {
       l = parse_deconv(options, params);
     }else if (lt == UNPOOL) {
       l = parse_unpool(options, params);
-    }else{
+    }else if (lt == SOFTMAX){
+      l = parse_softmax(options, params);
+    }else if (lt == SELF_ATTENTION){
+      l = parse_self_attention(options, params);
+    }else if(lt == MULTIHEAD_ATTENTION){
+      l = parse_multihead_attention(options, params);
+    }
+    else{
       fprintf(stderr, "Type not recognized: %s\n", s->type);
     }
 

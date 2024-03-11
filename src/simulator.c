@@ -10,6 +10,110 @@
 #include "parser.h"
 #include "utils.h"
 
+/*newly added function*/
+// Calculate mac ops of matrix_a(a_h * a_w) * matrix_b(b_h * b_w)
+float matmul_ops(int a_h, int a_w, int b_h, int b_w){
+  float ops = 0;
+  if(a_w != b_h){
+    error("Matmul not appropriate!");
+  }else{
+    ops = a_w * b_w * a_h;
+  }
+  return ops;
+}
+
+float matmul_mem(int a_h, int a_w, int b_h, int b_w, int mac_dtype, int vec_dtype){
+  float mem = 0;
+  mem += mac_dtype * (a_h * a_w + b_h * b_w);
+  mem += vec_dtype * a_h * b_w;
+  return mem;
+}
+
+float softmax_ops(int height, int width, int lut){
+  float ops = 0;
+  if(lut){
+    // lut for e^x, then add all for norm(h*w), then value/sum (h*w)
+    ops = 2 * height * width;
+  }else{
+    //e^x = 1 + x + (1/2)x^2 (2 of mac operation)
+    ops = 2 * height * width + 2 * height * width;
+  }
+  return ops;
+}
+
+float softmax_mem(int height, int width, int lut, int mac_dtype, int vec_dtype){
+  float mem = 0;
+  if(lut){
+    mem += vec_dtype * height * width * 2; // Load matrix and search for lut
+    mem += vec_dtype * height * width; // Store matrix
+  }else{
+    mem += vec_dtype * height * width * 2; // Load & Store
+  }
+  return mem;
+}
+
+float self_attention_ops(int height, int width, int d_model, int lut){
+  float ops = 0;
+  // transformation of input matrix to Q,K,V
+  ops += 3 * matmul_ops(height, width, width, d_model);
+
+  // Q * K^T
+  ops += matmul_ops(height, d_model, d_model, height);
+
+  // Scale(Q * K^T) : (Q * K^T)/(d_model^1/2)
+  ops += height * height;  //mac operation for division
+
+  // Softmax( Scale(Q * K^T) )
+  ops += softmax_ops(height, height, lut);
+
+  // Softmax( Scale(Q * K^T) ) * V
+  ops += matmul_ops(height, height, height, d_model);
+
+  return ops;
+}
+
+float self_attention_mem(int height, int width, int d_model, int lut, int mac_dtype, int vec_dtype){
+  float mem = 0;
+  // transformation of input matrix to Q,K,V
+  mem += 3 * matmul_mem(height, width, width, d_model, mac_dtype, vec_dtype);
+
+  // Q * K^T
+  mem += matmul_mem(height, d_model, d_model, height, mac_dtype, vec_dtype);
+
+  // Scale(Q * K^T) : (Q * K^T)/(d_model^1/2)
+  mem += (mac_dtype + vec_dtype) * height * height;  //mac operation for division, load and store
+
+  // Softmax( Scale(Q * K^T) )
+  mem += softmax_mem(height, height, lut, mac_dtype, vec_dtype);
+
+  // Softmax( Scale(Q * K^T) ) * V
+  mem += matmul_mem(height, height, height, d_model, mac_dtype, vec_dtype);
+
+  return mem;
+}
+
+float multihead_attention_ops(int height, int width, int d_model, int lut, int N_head){
+  float ops = 0;
+  // N_head of self_attention
+  ops += N_head * self_attention_ops(height, width, d_model, lut);
+
+  // Linear transformation for concated matrix
+  ops += matmul_ops(height, d_model*N_head, d_model*N_head, width);
+
+  return ops;
+}
+
+float multihead_attention_mem(int height, int width, int d_model, int lut, int N_head, int mac_dtype, int vec_dtype){
+  float mem = 0;
+  // N_head of self_attention
+  mem += N_head * self_attention_mem(height, width, d_model, lut, mac_dtype, vec_dtype);
+
+  // Linear transformation for concated matrix
+  mem += matmul_mem(height, d_model*N_head, d_model*N_head, width, mac_dtype, vec_dtype);
+
+  return mem;
+}
+
 void operations(char *asicfile, char *cfgfile) {
   asic *hardware = (asic*)xmalloc(sizeof(asic));
   parse_hardware_cfg(asicfile, hardware);
@@ -259,7 +363,40 @@ void operations(char *asicfile, char *cfgfile) {
       //perf
       alu_perf = (((((ops / hardware->vec_num)) / hardware->freq) / (1000))) / ((hardware->ave_alu_eff/100) * vec_alu_pipe_eff);
       mem_perf = (((mem / (1024 * 1024 * 1024)) / hardware->off_bw) * 1000 * 1000 ) / (hardware->ave_bw_eff/100);// + hardware->latency;
+    }else if(l.type == SOFTMAX){
+      //ops
+      ops += softmax_ops(l.h, l.w, l.lut);
+
+      //mem
+      mem += softmax_mem(l.h, l.w, l.lut, mac_dtype, vec_dtype);
+
+      //perf
+      alu_perf = (((((ops / hardware->mac_num)) / hardware->freq) / (1000))) / ((hardware->ave_alu_eff/100) * mac_alu_pipe_eff);
+      mem_perf = (((mem / (1024 * 1024 * 1024)) / hardware->off_bw) * 1000 * 1000 ) / (hardware->ave_bw_eff/100);// + hardware->latency;
+    }else if (l.type == SELF_ATTENTION){
+      //ops
+      ops += self_attention_ops(l.h, l.w, l.d_model, l.lut);
+
+      //mem
+      mem += self_attention_mem(l.h, l.w, l.d_model, l.lut, mac_dtype, vec_dtype);
+
+      //perf
+      alu_perf = (((((ops / hardware->mac_num)) / hardware->freq) / (1000))) / ((hardware->ave_alu_eff/100) * mac_alu_pipe_eff);
+      mem_perf = (((mem / (1024 * 1024 * 1024)) / hardware->off_bw) * 1000 * 1000 ) / (hardware->ave_bw_eff/100);// + hardware->latency;
+    }else if (l.type == MULTIHEAD_ATTENTION)
+    {
+      //ops
+      ops += multihead_attention_ops(l.h, l.w, l.d_model, l.lut, l.N_head);
+
+      //mem
+      mem += multihead_attention_mem(l.h, l.w, l.d_model, l.lut, l.N_head, mac_dtype, vec_dtype);
+
+      //perf
+      alu_perf = (((((ops / hardware->mac_num)) / hardware->freq) / (1000))) / ((hardware->ave_alu_eff/100) * mac_alu_pipe_eff);
+      mem_perf = (((mem / (1024 * 1024 * 1024)) / hardware->off_bw) * 1000 * 1000 ) / (hardware->ave_bw_eff/100);// + hardware->latency;
     }
+    
+    
   }
 
   alu_bottleneck = (alu_perf-mem_perf) > 0.0000001 ? 1 : 0;
