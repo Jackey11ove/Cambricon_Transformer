@@ -36,6 +36,7 @@ layer parse_unpool(list *options, size_params params);
 layer parse_softmax(list *options, size_params params);
 layer parse_self_attention(list *options, size_params params);
 layer parse_multihead_attention(list *options, size_params params);
+layer parse_feed_forward(list *options, size_params params);
 
 network parse_network_cfg(char *filename);
 void parse_hardware_cfg(char *filename, asic *hardware);

@@ -40,6 +40,7 @@ LAYER_TYPE string_to_layer_type(char * type) {
     if (strcmp(type, "[softmax]")==0 )           return SOFTMAX;
     if (strcmp(type, "[self_attention]")==0 )    return SELF_ATTENTION;
     if (strcmp(type, "[multihead_attention]")==0 ) return MULTIHEAD_ATTENTION;
+    if (strcmp(type, "[feed_forward]")==0 )      return FEED_FORWARD;
     if (strcmp(type, "[empty]") == 0)            return EMPTY;
     return BLANK;
 }
@@ -506,6 +507,19 @@ layer parse_multihead_attention(list *options, size_params params){
   return l;
 }
 
+layer parse_feed_forward(list *options, size_params params){
+  layer l;
+
+  l.type = FEED_FORWARD;
+  l.h = params.h;
+  l.w = params.w;
+  l.d_ff = option_find_int(options, "d_ff", 1);
+
+  l.out_h = params.h;
+  l.out_w = params.w; 
+
+  return l;
+}
 
 
 //=============================================================
@@ -580,6 +594,8 @@ network parse_network_cfg(char *filename) {
       l = parse_self_attention(options, params);
     }else if(lt == MULTIHEAD_ATTENTION){
       l = parse_multihead_attention(options, params);
+    }else if(lt == FEED_FORWARD){
+      l = parse_feed_forward(options, params);
     }
     else{
       fprintf(stderr, "Type not recognized: %s\n", s->type);

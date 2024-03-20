@@ -48,6 +48,14 @@ typedef struct layer layer;
 struct asic;
 typedef struct asic asic;
 
+// struct to record number of mac & vec operations
+struct mv_operations
+{
+  float mac_ops;
+  float vec_ops;
+};
+
+
 // layer.h
 typedef enum {
     CONVOLUTIONAL,
@@ -69,6 +77,7 @@ typedef enum {
     SOFTMAX,
     SELF_ATTENTION,
     MULTIHEAD_ATTENTION,
+    FEED_FORWARD,
     EMPTY,
     BLANK
 } LAYER_TYPE;
@@ -100,6 +109,7 @@ struct layer {
     int lut;  // 0 means using taylor for nolinear operator, 1 means using lut
     int d_model;  // dimension of vectors in Q K V
     int N_head;  //param for multihead_attention
+    int d_ff;  // weight matrix width for feed_forward
 
     struct layer *input_layer;
     struct layer *self_layer;
